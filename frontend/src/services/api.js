@@ -1,11 +1,24 @@
 import axios from "axios";
 
+const isLocal = typeof window !== "undefined" && (
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+);
+
 const API_CANDIDATES = [
   import.meta.env.VITE_API_URL,
-  "/api"
+  isLocal ? "http://127.0.0.1:8000" : "https://momentum-ai-api.vercel.app",
+  isLocal ? "http://127.0.0.1:8080" : null,
+  isLocal ? "https://momentum-ai-api.vercel.app" : "http://127.0.0.1:8000",
 ].filter(Boolean);
 
-let activeBase = localStorage.getItem("momentum_api_base") || API_CANDIDATES[0];
+let savedBase = localStorage.getItem("momentum_api_base");
+if (savedBase && !API_CANDIDATES.includes(savedBase)) {
+  savedBase = null;
+  localStorage.removeItem("momentum_api_base");
+}
+
+let activeBase = savedBase || API_CANDIDATES[0];
 
 export const api = axios.create({ baseURL: activeBase, timeout: 12000 });
 

@@ -12,8 +12,17 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem("momentum_token");
     if (!token) return;
     api.get("/api/auth/me")
-      .then(({ data }) => setUser(data))
-      .catch(() => localStorage.removeItem("momentum_token"))
+      .then(({ data }) => {
+        if (data && typeof data === "object" && data.role) {
+          setUser(data);
+        } else {
+          throw new Error("Invalid user response");
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem("momentum_token");
+        setUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -25,9 +34,13 @@ export function AuthProvider({ children }) {
       setError("");
       try {
         const { data } = await api.post("/api/auth/login", { email, password });
-        localStorage.setItem("momentum_token", data.token);
-        setUser(data.user);
-        return data.user;
+        if (data && data.token && data.user && data.user.role) {
+          localStorage.setItem("momentum_token", data.token);
+          setUser(data.user);
+          return data.user;
+        } else {
+          throw new Error("Invalid response from server");
+        }
       } catch (err) {
         const message = messageFromError(err);
         setError(message);
