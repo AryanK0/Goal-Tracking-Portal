@@ -113,7 +113,18 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(current_user))
             for item in db.query(UnlockHistory).order_by(UnlockHistory.created_at.desc()).all()
         ],
         "escalations": [
-            {"id": item.id, "employee_id": item.employee_id, "goal_id": item.goal_id, "risk_score": item.risk_score, "risk_level": "High" if item.risk_score >= 75 else "Medium" if item.risk_score >= 45 else "Low", "days_overdue": max(1, round(item.risk_score / 9)), "escalation_level": item.escalation_level, "reason": item.reason, "created_at": item.created_at.isoformat()}
+            {
+                "id": item.id,
+                "employee_id": item.employee_id,
+                "goal_id": item.goal_id,
+                "risk_score": item.risk_score,
+                "risk_level": "High" if item.risk_score >= 75 else "Medium" if item.risk_score >= 45 else "Low",
+                "days_overdue": item.days_overdue,
+                "status": item.status,
+                "escalation_level": item.escalation_level,
+                "reason": item.reason,
+                "created_at": item.created_at.isoformat(),
+            }
             for item in db.query(EscalationLog).order_by(EscalationLog.created_at.desc()).all()
         ],
         "ai_insights": [

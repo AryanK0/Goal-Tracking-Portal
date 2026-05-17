@@ -82,6 +82,7 @@ Terminal 2:
 
 ```powershell
 cd "C:\Users\FRIDAY\OneDrive\Desktop\Momentum"
+$env:VITE_API_URL="http://127.0.0.1:8000"
 npm --prefix frontend install
 npm --prefix frontend run dev -- --port 5173 --strictPort
 ```
@@ -110,9 +111,12 @@ Start Command: python -m uvicorn backend.app.main:app --host 0.0.0.0 --port $POR
 Environment:
   DATABASE_URL=mysql+pymysql://user:password@host:3306/momentum_ai
   JWT_SECRET=<strong-secret>
+  REDIS_URL=<optional-redis-url>
+  CORS_ORIGINS=https://your-frontend.example.com
 ```
 
 For MySQL, load `database/schema.sql`. Local development defaults to SQLite at `database/momentum_ai.db`.
+Copy `.env.example` to your local environment manager and replace only placeholder values. Do not commit `.env`.
 
 ## BRD Coverage Checklist
 

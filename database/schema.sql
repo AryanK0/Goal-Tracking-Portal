@@ -133,6 +133,8 @@ CREATE TABLE escalation_logs (
   goal_id VARCHAR(32),
   risk_score INT NOT NULL,
   escalation_level VARCHAR(60) NOT NULL,
+  days_overdue INT DEFAULT 1,
+  status VARCHAR(32) DEFAULT 'Open',
   reason TEXT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (employee_id) REFERENCES users(id),

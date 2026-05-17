@@ -2,8 +2,7 @@ import axios from "axios";
 
 const API_CANDIDATES = [
   import.meta.env.VITE_API_URL,
-  "http://127.0.0.1:8000",
-  "http://127.0.0.1:8080"
+  "/api"
 ].filter(Boolean);
 
 let activeBase = localStorage.getItem("momentum_api_base") || API_CANDIDATES[0];

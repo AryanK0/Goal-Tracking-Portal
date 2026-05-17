@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from backend.app.ai.engine import copilot, manager_summary, recommendation_engine, smart_goal
 from backend.app.auth.security import current_user, require_roles
 from backend.app.database.session import get_db
-from backend.app.models.entities import AIInsight, EscalationLog, Goal, QuarterUpdate, User
+from backend.app.models.entities import AIInsight, AuditLog, Goal, QuarterUpdate, User
 from backend.app.schemas.dto import CopilotPrompt, SmartPrompt
 from backend.app.services.cache import cache_delete_prefix
 from backend.app.services.calculations import department_metrics, health_for
+from backend.app.services.escalation_service import recompute_escalations
 from backend.app.services.serializers import goal_out, user_out
 from backend.app.utils.ids import uid
 
@@ -19,8 +20,12 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
 @router.post("/smart-goal")
-def smart(payload: SmartPrompt, user: User = Depends(current_user)):
-    return smart_goal(payload.prompt, payload.department or user.department)
+def smart(payload: SmartPrompt, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    result = smart_goal(payload.prompt, payload.department or user.department)
+    db.add(AuditLog(id=uid(), changed_by=user.id, actor_name=user.name, field_changed="AI SMART Goal Generated", old_value=payload.prompt, new_value=result["title"], reason="AI-generated goal draft", affected_entity="AI", entity_id=user.id))
+    db.commit()
+    cache_delete_prefix("dashboard:")
+    return {**result, "audit_hint": "AI suggestion only; saved goal changes are audited when submitted."}
 
 
 @router.get("/recommendations")
@@ -65,23 +70,7 @@ def hr_copilot(payload: CopilotPrompt, db: Session = Depends(get_db), user: User
 
 @router.post("/escalations/recompute")
 def recompute(db: Session = Depends(get_db), user: User = Depends(require_roles("Admin", "Manager"))):
-    db.query(EscalationLog).delete()
-    updates = db.query(QuarterUpdate).all()
-    count = 0
-    for goal in db.query(Goal).all():
-        q2 = next((update for update in updates if update.goal_id == goal.goal_id and update.quarter == "Q2"), None)
-        health = health_for(goal, goal.owner, q2)
-        reasons = list(health["causes"])
-        if goal.approval_status in {"Draft", "Returned"}:
-            reasons.append("No submission")
-        if goal.approval_status in {"Submitted", "Pending", "Pending Approval"}:
-            reasons.append("Delayed approval")
-        if not q2 or q2.achievement == 0:
-            reasons.append("Missing quarter update")
-        if health["risk_score"] >= 45 or len(reasons) > len(health["causes"]):
-            level = "HR + skip-level" if health["risk_score"] >= 75 else "Manager" if health["risk_score"] >= 45 else "Employee reminder"
-            db.add(EscalationLog(id=uid(), employee_id=goal.user_id, goal_id=goal.goal_id, risk_score=health["risk_score"], escalation_level=level, reason=", ".join(dict.fromkeys(reasons))))
-            count += 1
+    count = recompute_escalations(db)
     db.commit()
     cache_delete_prefix("dashboard:")
     return {"count": count}

@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session
 from backend.app.database.session import get_db
 from backend.app.models.entities import User
 
-SECRET_KEY = os.getenv("JWT_SECRET", "momentum-ai-demo-secret-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET")
+if not SECRET_KEY:
+    if os.getenv("VERCEL") or os.getenv("RENDER") or os.getenv("RAILWAY_ENVIRONMENT"):
+        raise RuntimeError("JWT_SECRET must be configured in production.")
+    SECRET_KEY = "local-development-only"
 ALGORITHM = "HS256"
 security = HTTPBearer()
 

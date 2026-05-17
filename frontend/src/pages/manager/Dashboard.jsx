@@ -18,6 +18,8 @@ export default function ManagerDashboard() {
   if (error) return <ErrorState message={error} />;
   const pending = data.visible_goals.filter((goal) => goal.approval_status === "Pending Approval" || goal.approval_status === "Returned");
   const team = new Set(data.visible_goals.map((goal) => goal.user_id)).size;
+  const completionRate = Math.round(data.visible_goals.reduce((sum, goal) => sum + goal.progress, 0) / Math.max(data.visible_goals.length, 1));
+  const atRisk = new Set(data.visible_goals.filter((goal) => goal.risk_score >= 45).map((goal) => goal.user_id)).size;
   const summaries = async () => {
     try {
       for (const employeeId of [...new Set(data.visible_goals.map((goal) => goal.user_id))]) {
@@ -34,9 +36,9 @@ export default function ManagerDashboard() {
       <PageHeader title="Manager Dashboard" subtitle="Review submitted goals, edit target and weightage inline, return for rework, approve and lock." action={<Button variant="primary" onClick={summaries}><Brain className="h-4 w-4" /> Generate Team Summaries</Button>} />
       <div className="mb-4 grid gap-4 md:grid-cols-4">
         <KpiCard icon={Users} label="Team members" value={team} tone="purple" />
-        <KpiCard icon={ClipboardCheck} label="Pending review" value={pending.length} />
-        <KpiCard icon={CheckCircle2} label="Approved goals" value={data.visible_goals.filter((goal) => goal.approval_status === "Approved").length} tone="green" />
-        <KpiCard icon={Brain} label="AI insights" value={data.ai_insights.length} tone="red" />
+        <KpiCard icon={ClipboardCheck} label="Pending approvals" value={pending.length} />
+        <KpiCard icon={CheckCircle2} label="Completion rate" value={`${completionRate}%`} tone="green" />
+        <KpiCard icon={Brain} label="At risk employees" value={atRisk} tone="red" />
       </div>
       <Card>
         <CardHeader icon={ClipboardCheck} title="Approval Queue" hint="Approve, return, comment, and update check-in status." />

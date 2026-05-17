@@ -15,14 +15,16 @@ export default function EmployeeDashboard() {
   const goals = data.visible_goals;
   const avg = Math.round(goals.reduce((sum, goal) => sum + goal.progress, 0) / Math.max(goals.length, 1));
   const completed = goals.filter((goal) => goal.status === "Completed").length;
+  const completionProbability = Math.round(goals.reduce((sum, goal) => sum + goal.completion_probability, 0) / Math.max(goals.length, 1));
+  const burnoutRisk = data.current_user.workload >= 80 ? "High" : data.current_user.workload >= 65 ? "Medium" : "Low";
   return (
     <>
       <PageHeader title="Employee Dashboard" subtitle="Create goals, track progress, upload evidence, and see AI health signals for your current cycle." />
       <div className="mb-4 grid gap-4 md:grid-cols-4">
-        <KpiCard icon={Target} label="My goals" value={goals.length} />
-        <KpiCard icon={CheckCircle2} label="Average progress" value={`${avg}%`} tone="green" />
-        <KpiCard icon={Award} label="Completed" value={completed} tone="purple" />
-        <KpiCard icon={Flame} label="Streak" value={`${data.current_user.streak}Q`} tone="red" />
+        <KpiCard icon={Target} label="Goals" value={`${goals.length}/8`} />
+        <KpiCard icon={CheckCircle2} label="Completion probability" value={`${completionProbability}%`} tone="green" />
+        <KpiCard icon={Award} label="SMART score" value={avg} tone="purple" />
+        <KpiCard icon={Flame} label="Burnout risk" value={burnoutRisk} tone="red" />
       </div>
       <div className="grid gap-4">
         <AnalyticsCharts data={{ ...data, goals }} />

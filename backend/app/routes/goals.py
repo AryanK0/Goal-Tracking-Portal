@@ -9,11 +9,14 @@ from sqlalchemy.orm import Session
 
 from backend.app.auth.security import current_user, require_roles
 from backend.app.database.session import get_db
-from backend.app.models.entities import AuditLog, Goal, Notification, QuarterUpdate, SharedGoal, SharedGoalMapping, UnlockHistory, User
+from backend.app.models.entities import AuditLog, Goal, Notification, QuarterUpdate, SharedGoalMapping, User
 from backend.app.schemas.dto import ApprovalIn, GoalCreate, GoalPatch, QuarterUpdateIn, SharedGoalIn, UnlockIn
-from backend.app.services.calculations import cycle_state, progress_for
 from backend.app.services.cache import cache_delete_prefix
+from backend.app.services.cycle_service import require_cycle_open as enforce_cycle_open
+from backend.app.services.shared_goal_service import create_shared_goal, get_linked_goals, sync_goal_updates, toggle_sync
+from backend.app.services.calculations import progress_for
 from backend.app.services.serializers import goal_out
+from backend.app.services.unlock_service import relock_goal, unlock_goal
 from backend.app.utils.ids import uid
 
 router = APIRouter(prefix="/api/goals", tags=["goals"])
@@ -29,9 +32,7 @@ def can_access_goal(user: User, goal: Goal) -> bool:
 
 
 def require_cycle_open(period: str, user: User) -> None:
-    state = cycle_state(period)
-    if user.role != "Admin" and not state["active"]:
-        raise HTTPException(403, state["notice"])
+    enforce_cycle_open(period, user.role)
 
 
 def shared_counts(db: Session) -> Counter:
@@ -39,13 +40,7 @@ def shared_counts(db: Session) -> Counter:
 
 
 def linked_goals_for(db: Session, goal: Goal) -> list[Goal]:
-    mappings = db.query(SharedGoalMapping).filter(SharedGoalMapping.primary_goal_id == goal.goal_id, SharedGoalMapping.sync_enabled.is_(True)).all()
-    if mappings:
-        linked_ids = [mapping.linked_goal_id for mapping in mappings if mapping.linked_goal_id != goal.goal_id]
-        return db.query(Goal).filter(Goal.goal_id.in_(linked_ids)).all() if linked_ids else []
-    if goal.shared_goal_id:
-        return db.query(Goal).filter(Goal.shared_goal_id == goal.shared_goal_id, Goal.goal_id != goal.goal_id).all()
-    return []
+    return get_linked_goals(db, goal)
 
 
 def user_weight_total(db: Session, user_id: str, replace_goal_id: str | None = None, replacement_weight: int | None = None) -> int:
@@ -174,11 +169,7 @@ def unlock(goal_id: str, payload: UnlockIn, db: Session = Depends(get_db), user:
     goal = db.get(Goal, goal_id)
     if not goal:
         raise HTTPException(404, "Goal not found")
-    goal.locked = False
-    goal.approval_status = "Unlocked"
-    db.add(UnlockHistory(id=uid(), goal_id=goal.goal_id, admin_id=user.id, admin_name=user.name, action="Unlocked", reason=payload.reason))
-    db.add(Notification(id=uid(), user_id=goal.user_id, type="Goal Unlocked", message=f"{goal.title} unlocked by Admin: {payload.reason}"))
-    audit(db, user, "Goal Unlocked", "Locked", "Unlocked", payload.reason, entity_id=goal.goal_id)
+    unlock_goal(db, goal, user, payload.reason)
     db.commit()
     cache_delete_prefix("dashboard:")
     return {"ok": True}
@@ -189,11 +180,7 @@ def relock(goal_id: str, payload: UnlockIn, db: Session = Depends(get_db), user:
     goal = db.get(Goal, goal_id)
     if not goal:
         raise HTTPException(404, "Goal not found")
-    goal.locked = True
-    goal.approval_status = "Approved"
-    db.add(UnlockHistory(id=uid(), goal_id=goal.goal_id, admin_id=user.id, admin_name=user.name, action="Re-locked", reason=payload.reason))
-    db.add(Notification(id=uid(), user_id=goal.user_id, type="Goal Re-locked", message=f"{goal.title} re-locked by Admin: {payload.reason}"))
-    audit(db, user, "Goal Re-locked", "Unlocked", "Locked", payload.reason, entity_id=goal.goal_id)
+    relock_goal(db, goal, user, payload.reason)
     db.commit()
     cache_delete_prefix("dashboard:")
     return {"ok": True}
@@ -216,17 +203,7 @@ def quarter_update(goal_id: str, payload: QuarterUpdateIn, db: Session = Depends
     goal.status = payload.status
     affected = 1
     if goal.shared_goal_id and goal.primary_owner:
-        linked = linked_goals_for(db, goal)
-        affected += len(linked)
-        for linked_goal in linked:
-            linked_update = db.query(QuarterUpdate).filter(QuarterUpdate.goal_id == linked_goal.goal_id, QuarterUpdate.quarter == payload.quarter).first()
-            if linked_update:
-                linked_update.achievement = payload.achievement
-                linked_update.progress = progress_for(linked_goal, linked_update)
-                linked_goal.status = payload.status
-                db.add(Notification(id=uid(), user_id=linked_goal.user_id, type="Shared Goal Sync", message=f"{goal.title} synced {payload.quarter} achievement to your linked KPI."))
-        if affected > 1:
-            db.add(Notification(id=uid(), user_id=goal.user_id, type="Shared Goal Sync", message=f"This update affects {affected} linked goals."))
+        affected += sync_goal_updates(db, goal, update, user)
     audit(db, user, "Quarter Update", goal.title, f"{payload.quarter}: {payload.achievement}", f"Affected linked goals: {affected}", entity="QuarterUpdate", entity_id=goal.goal_id)
     db.commit()
     cache_delete_prefix("dashboard:")
@@ -258,22 +235,17 @@ def push_shared_goal(payload: SharedGoalIn, db: Session = Depends(get_db), user:
             raise HTTPException(400, f"Recipient {linked_user} already has maximum goals")
         if user_weight_total(db, linked_user) + payload.weightage > 100:
             raise HTTPException(400, f"Recipient {linked_user} would exceed 100% weightage")
-    shared_id = uid()
-    shared = SharedGoal(shared_goal_id=shared_id, linked_users=json.dumps(payload.linked_users), **payload.model_dump(exclude={"linked_users", "weightage"}))
-    db.add(shared)
-    created_goals: list[Goal] = []
-    for linked_user in payload.linked_users:
-        goal = Goal(goal_id=uid(), user_id=linked_user, title=payload.title, description=payload.description, thrust_area=payload.thrust_area, uom_type=payload.uom_type, target=payload.target, target_label=payload.target_label, direction="min", weightage=payload.weightage, shared_goal_id=shared_id, primary_owner=linked_user == payload.primary_owner, approval_status="Pending Approval")
-        db.add(goal)
-        created_goals.append(goal)
-        db.flush()
-        for quarter, factor in [("Q1", 0.25), ("Q2", 0.5), ("Q3", 0.75), ("Q4", 1)]:
-            db.add(QuarterUpdate(id=uid(), goal_id=goal.goal_id, quarter=quarter, planned=payload.target * factor, achievement=0, progress=0))
-    primary_goal = next((goal for goal in created_goals if goal.primary_owner), created_goals[0])
-    for goal in created_goals:
-        db.add(SharedGoalMapping(id=uid(), primary_goal_id=primary_goal.goal_id, linked_goal_id=goal.goal_id, owner_id=goal.user_id, sync_enabled=True))
-        db.add(Notification(id=uid(), user_id=goal.user_id, type="Shared Goal Assigned", message=f"{payload.title} was assigned as a shared KPI."))
-    audit(db, user, "Shared Goal Pushed", "", payload.title, f"Recipients: {len(payload.linked_users)}", entity="SharedGoal", entity_id=shared_id)
+    shared_id, affected = create_shared_goal(db, payload, user)
     db.commit()
     cache_delete_prefix("dashboard:")
-    return {"shared_goal_id": shared_id, "affected_linked_goals": len(payload.linked_users)}
+    return {"shared_goal_id": shared_id, "affected_linked_goals": affected}
+
+
+@router.patch("/shared/mappings/{mapping_id}")
+def update_shared_mapping(mapping_id: str, sync_enabled: bool, db: Session = Depends(get_db), user: User = Depends(require_roles("Manager", "Admin"))):
+    mapping = toggle_sync(db, mapping_id, sync_enabled, user)
+    if not mapping:
+        raise HTTPException(404, "Shared goal mapping not found")
+    db.commit()
+    cache_delete_prefix("dashboard:")
+    return {"id": mapping.id, "sync_enabled": mapping.sync_enabled}

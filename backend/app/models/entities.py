@@ -168,6 +168,8 @@ class EscalationLog(Base):
     goal_id: Mapped[str | None] = mapped_column(String(32), ForeignKey("goals.goal_id"), nullable=True)
     risk_score: Mapped[int] = mapped_column(Integer, nullable=False)
     escalation_level: Mapped[str] = mapped_column(String(60), nullable=False)
+    days_overdue: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(32), default="Open")
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
 
 from backend.app.models.entities import Goal, QuarterUpdate, User
+from backend.app.services.cycle_service import WINDOWS, cycle_state
 
 
 def progress_for(goal: Goal, update: QuarterUpdate | None = None) -> int:
@@ -14,30 +14,6 @@ def progress_for(goal: Goal, update: QuarterUpdate | None = None) -> int:
     if goal.direction in {"max", "timeline"}:
         return max(0, min(100, round((target / max(actual, 0.1)) * 100)))
     return max(0, min(100, round((actual / max(target, 1)) * 100)))
-
-
-WINDOWS = {
-    "Goal Setting": {"months": {5}, "opens": "May 1"},
-    "Q1": {"months": {7}, "opens": "July"},
-    "Q2": {"months": {10}, "opens": "October"},
-    "Q3": {"months": {1}, "opens": "January"},
-    "Q4": {"months": {3, 4}, "opens": "March-April"},
-}
-
-
-def cycle_state(period: str | None = None, today: date | None = None) -> dict:
-    today = today or date.today()
-    states = {}
-    for key, config in WINDOWS.items():
-        active = today.month in config["months"]
-        states[key] = {
-            "active": active,
-            "opens": config["opens"],
-            "notice": "" if active else f"{key} check-in opens {config['opens']}" if key.startswith("Q") else f"Goal setting opens {config['opens']}",
-        }
-    if period:
-        return states.get(period, {"active": False, "opens": "", "notice": "Cycle window is closed"})
-    return {"today": today.isoformat(), "windows": states}
 
 
 def health_for(goal: Goal, user: User, update: QuarterUpdate | None = None, quarter_completion: int = 80) -> dict:

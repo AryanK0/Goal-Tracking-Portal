@@ -49,3 +49,12 @@ Password for all demo users: `Momentum@123`
 - The Vercel backend uses ephemeral SQLite demo data unless `DATABASE_URL` is set to a managed database.
 - SpeechRecognition works only in supported browsers such as Chrome and Edge.
 - Email, Teams, and enterprise SSO hooks remain internal demo hooks until provider credentials are configured.
+
+## Required Environment Variables
+
+- `VITE_API_URL`
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `REDIS_URL` optional
+- `OPENAI_API_KEY` optional
+- `CORS_ORIGINS`

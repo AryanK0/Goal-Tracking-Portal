@@ -16,6 +16,7 @@ export default function AdminDashboard() {
   const toast = useToast();
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} />;
+  const completionRate = Math.round(data.goals.reduce((sum, goal) => sum + goal.progress, 0) / Math.max(data.goals.length, 1));
   const recompute = async () => {
     try {
       const { data: result } = await api.post("/api/ai/escalations/recompute");
@@ -29,8 +30,8 @@ export default function AdminDashboard() {
     <>
       <PageHeader title="Admin Dashboard" subtitle="Cycle governance, hierarchy, unlock exceptions, escalation history, and organization-wide completion." action={<Button variant="primary" onClick={recompute}><Zap className="h-4 w-4" /> Recompute Escalations</Button>} />
       <div className="mb-4 grid gap-4 md:grid-cols-4">
-        <KpiCard icon={Users} label="Users" value={data.users.length} tone="green" />
-        <KpiCard icon={Shield} label="Audit entries" value={data.audit_logs.length} />
+        <KpiCard icon={Users} label="Employees" value={data.users.filter((user) => user.role === "Employee").length} tone="green" />
+        <KpiCard icon={Shield} label="Completion rate" value={`${completionRate}%`} />
         <KpiCard icon={Zap} label="Escalations" value={data.escalations.length} tone="red" />
         <KpiCard icon={Lock} label="Locked goals" value={data.goals.filter((goal) => goal.locked).length} tone="purple" />
       </div>
@@ -41,8 +42,13 @@ export default function AdminDashboard() {
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader icon={AlertTriangle} title="Open Escalations" hint="Risk level, days overdue, and escalation chain." />
+          <div className="mb-3 grid gap-2 sm:grid-cols-3">
+            <span className="rounded-xl border border-line bg-white/5 p-3 text-sm text-slate-300">Open issues: <b className="text-warning">{data.escalations.filter((item) => item.status === "Open").length}</b></span>
+            <span className="rounded-xl border border-line bg-white/5 p-3 text-sm text-slate-300">Resolved issues: <b className="text-mint">{data.escalations.filter((item) => item.status === "Resolved").length}</b></span>
+            <span className="rounded-xl border border-line bg-white/5 p-3 text-sm text-slate-300">Overdue count: <b className="text-danger">{data.escalations.filter((item) => item.days_overdue > 0).length}</b></span>
+          </div>
           <div className="grid gap-2">
-            {data.escalations.slice(0, 8).map((item) => <div key={item.id} className="premium-row rounded-xl border border-line bg-white/5 p-3 text-sm"><strong className="text-white">{item.risk_level} risk</strong><span className="ml-2 text-warning">{item.days_overdue} days overdue</span><p className="text-slate-400">{item.escalation_level}: {item.reason}</p></div>)}
+            {data.escalations.slice(0, 8).map((item) => <div key={item.id} className="premium-row rounded-xl border border-line bg-white/5 p-3 text-sm"><strong className="text-white">{item.risk_level} risk</strong><span className="ml-2 text-warning">{item.days_overdue} days overdue</span><span className="ml-2 text-cyan">{item.status}</span><p className="text-slate-400">{item.escalation_level}: {item.reason}</p></div>)}
           </div>
         </Card>
         <Card>
@@ -52,6 +58,14 @@ export default function AdminDashboard() {
           </div>
         </Card>
       </div>
+      <Card className="mt-4">
+        <CardHeader icon={Zap} title="AI Insights Feed" hint="Submission-ready signals for demo narration." />
+        <div className="grid gap-2 md:grid-cols-3">
+          <div className="premium-row rounded-xl border border-line bg-white/5 p-3 text-sm text-warning">Goal delayed: {data.escalations.filter((item) => item.status === "Open").length} open risks</div>
+          <div className="premium-row rounded-xl border border-line bg-white/5 p-3 text-sm text-cyan">Performance improved: {completionRate}% organization completion</div>
+          <div className="premium-row rounded-xl border border-line bg-white/5 p-3 text-sm text-mint">Team exceeded targets: {data.goals.filter((goal) => goal.progress >= 100).length} goals at 100%</div>
+        </div>
+      </Card>
       <UserManagement data={data} refresh={refresh} toast={toast} />
     </>
   );

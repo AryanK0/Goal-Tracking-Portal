@@ -11,6 +11,14 @@ const statusCopy = {
   error: "Error"
 };
 
+const actionCopy = {
+  idle: "Speak Goal",
+  listening: "Listening...",
+  processing: "Processing...",
+  success: "Goal Captured",
+  error: "Microphone unavailable"
+};
+
 export function VoiceInput({ label, context = "goal", onTranscript, onParsed, className = "" }) {
   const [status, setStatus] = useState("idle");
   const [transcript, setTranscript] = useState("");
@@ -69,7 +77,10 @@ export function VoiceInput({ label, context = "goal", onTranscript, onParsed, cl
       recognition.onend = () => {
         recognitionRef.current = null;
         if (finalText) processTranscript(finalText);
-        else if (!hadError) setStatus("idle");
+        else if (!hadError) {
+          setStatus("error");
+          setError("No speech was captured. Try again and speak after the browser prompt.");
+        }
       };
       recognition.start();
     } catch {
@@ -88,7 +99,7 @@ export function VoiceInput({ label, context = "goal", onTranscript, onParsed, cl
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="text-xs font-semibold uppercase text-slate-400">{label || "Voice input"}</span>
-          <p className={status === "error" ? "text-sm font-semibold text-danger" : "text-sm font-semibold text-cyan"}>{statusCopy[status]}</p>
+          <p className={status === "error" ? "text-sm font-semibold text-danger" : "text-sm font-semibold text-cyan"}>{statusCopy[status]} - {actionCopy[status]}</p>
         </div>
         {status === "listening" ? (
           <Button variant="danger" type="button" onClick={stop}><Square className="h-4 w-4" /> Stop</Button>
