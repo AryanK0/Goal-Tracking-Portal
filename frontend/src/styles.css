@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #050b12;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: #f1fffe;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(88, 255, 241, 0.18), transparent 28rem),
+    radial-gradient(circle at 88% 2%, rgba(155, 124, 255, 0.22), transparent 30rem),
+    radial-gradient(circle at 70% 95%, rgba(56, 242, 166, 0.12), transparent 28rem),
+    linear-gradient(135deg, #07111c 0%, #050b12 52%, #06131a 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.38;
+  background-image:
+    linear-gradient(rgba(88, 255, 241, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88, 255, 241, 0.08) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, black, transparent 95%);
+}
+
+body.light-shell {
+  color: #07111c;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(88, 255, 241, 0.2), transparent 28rem),
+    radial-gradient(circle at 88% 2%, rgba(155, 124, 255, 0.18), transparent 30rem),
+    linear-gradient(135deg, #eefcff 0%, #f8fbff 55%, #eefdf7 100%);
+}
+
+.login-mesh {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(88, 255, 241, 0.24), transparent 24rem),
+    radial-gradient(circle at 78% 18%, rgba(155, 124, 255, 0.22), transparent 26rem),
+    radial-gradient(circle at 52% 88%, rgba(56, 242, 166, 0.18), transparent 24rem),
+    linear-gradient(135deg, #05101a 0%, #06151f 48%, #03070d 100%);
+}
+
+.particle {
+  position: absolute;
+  bottom: -2rem;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(88, 255, 241, 0.8);
+  box-shadow: 0 0 18px rgba(88, 255, 241, 0.8);
+  animation: particle-rise 7s linear infinite;
+}
+
+@keyframes particle-rise {
+  from {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  to {
+    transform: translateY(-105vh);
+    opacity: 0;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border border-line bg-panel/80 shadow-glass backdrop-blur-2xl;
+    background-image: linear-gradient(145deg, rgba(255,255,255,.09), rgba(255,255,255,.025));
+  }
+
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-cyan/70 focus:ring-offset-0;
+  }
+
+  .premium-row {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-cyan/40 hover:bg-white/10;
+  }
+}
+
+input,
+select,
+textarea,
+button {
+  max-width: 100%;
+}
+
+td,
+th,
+p,
+span,
+strong {
+  overflow-wrap: anywhere;
+}
