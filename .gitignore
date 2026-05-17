@@ -9,6 +9,7 @@ dist/
 database/*.db
 __pycache__/
 **/__pycache__/
+**pycache**/
 *.py[cod]
 .pytest_cache/
 .venv/
@@ -16,3 +17,7 @@ venv/
 .env
 .env.*
 !.env.example
+.vercel/
+**/.vercel/
+
+.vercel

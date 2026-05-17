@@ -1,0 +1,20 @@
+[project]
+name = "momentum-ai-api"
+version = "1.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn==0.32.1",
+  "pydantic==2.10.3",
+  "email-validator==2.2.0",
+  "sqlalchemy==2.0.36",
+  "pymysql==1.1.1",
+  "pyjwt==2.10.1",
+  "python-multipart==0.0.20",
+  "openpyxl==3.1.5",
+  "alembic==1.14.0",
+  "redis==5.2.1"
+]
+
+[project.scripts]
+app = "backend.app.main:app"

@@ -7,7 +7,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_SQLITE = f"sqlite:///{(ROOT / 'database' / 'momentum_ai.db').as_posix()}"
+sqlite_path = Path("/tmp/momentum_ai.db") if os.getenv("VERCEL") else ROOT / "database" / "momentum_ai.db"
+DEFAULT_SQLITE = f"sqlite:///{sqlite_path.as_posix()}"
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SQLITE)
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

@@ -10,6 +10,7 @@ from backend.app.auth.security import current_user, require_roles
 from backend.app.database.session import get_db
 from backend.app.models.entities import AIInsight, EscalationLog, Goal, QuarterUpdate, User
 from backend.app.schemas.dto import CopilotPrompt, SmartPrompt
+from backend.app.services.cache import cache_delete_prefix
 from backend.app.services.calculations import department_metrics, health_for
 from backend.app.services.serializers import goal_out, user_out
 from backend.app.utils.ids import uid
@@ -48,6 +49,7 @@ def summary(employee_id: str, db: Session = Depends(get_db), user: User = Depend
     insight = AIInsight(id=uid(), employee_id=employee_id, summary=text, risk_prediction=json.dumps([goal["risk_score"] for goal in payload]))
     db.add(insight)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"summary": text}
 
 
@@ -69,10 +71,19 @@ def recompute(db: Session = Depends(get_db), user: User = Depends(require_roles(
     for goal in db.query(Goal).all():
         q2 = next((update for update in updates if update.goal_id == goal.goal_id and update.quarter == "Q2"), None)
         health = health_for(goal, goal.owner, q2)
-        if health["risk_score"] >= 45:
-            db.add(EscalationLog(id=uid(), employee_id=goal.user_id, goal_id=goal.goal_id, risk_score=health["risk_score"], escalation_level=health["escalation_level"], reason=", ".join(health["causes"])))
+        reasons = list(health["causes"])
+        if goal.approval_status in {"Draft", "Returned"}:
+            reasons.append("No submission")
+        if goal.approval_status in {"Submitted", "Pending", "Pending Approval"}:
+            reasons.append("Delayed approval")
+        if not q2 or q2.achievement == 0:
+            reasons.append("Missing quarter update")
+        if health["risk_score"] >= 45 or len(reasons) > len(health["causes"]):
+            level = "HR + skip-level" if health["risk_score"] >= 75 else "Manager" if health["risk_score"] >= 45 else "Employee reminder"
+            db.add(EscalationLog(id=uid(), employee_id=goal.user_id, goal_id=goal.goal_id, risk_score=health["risk_score"], escalation_level=level, reason=", ".join(dict.fromkeys(reasons))))
             count += 1
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"count": count}
 
 

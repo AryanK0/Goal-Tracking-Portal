@@ -12,6 +12,7 @@ from backend.app.database.session import get_db
 from backend.app.models.entities import AuditLog, Goal, Notification, QuarterUpdate, SharedGoal, SharedGoalMapping, UnlockHistory, User
 from backend.app.schemas.dto import ApprovalIn, GoalCreate, GoalPatch, QuarterUpdateIn, SharedGoalIn, UnlockIn
 from backend.app.services.calculations import cycle_state, progress_for
+from backend.app.services.cache import cache_delete_prefix
 from backend.app.services.serializers import goal_out
 from backend.app.utils.ids import uid
 
@@ -89,6 +90,7 @@ def create_goal(payload: GoalCreate, db: Session = Depends(get_db), user: User =
         db.add(update)
     audit(db, user, "Goal Created", "", goal.title, entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return goal_out(goal, goal.owner, db.query(QuarterUpdate).filter(QuarterUpdate.goal_id == goal.goal_id).all())
 
 
@@ -107,11 +109,17 @@ def update_goal(goal_id: str, payload: GoalPatch, db: Session = Depends(get_db),
         raise HTTPException(400, "Total goal weightage cannot exceed 100%")
     if any(getattr(payload, field) is not None for field in {"title", "description", "thrust_area", "uom_type", "direction", "target", "target_label", "weightage"}):
         require_cycle_open("Goal Setting", user)
-    old = goal.title
+    old_values = {
+        key: getattr(goal, key)
+        for key, value in payload.model_dump(exclude_none=True).items()
+        if value != getattr(goal, key)
+    }
     for key, value in payload.model_dump(exclude_none=True).items():
         setattr(goal, key, value)
-    audit(db, user, "Goal Updated", old, goal.title)
+    for key, old_value in old_values.items():
+        audit(db, user, f"Goal Updated: {key}", str(old_value), str(getattr(goal, key)), entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return goal_out(goal, goal.owner, db.query(QuarterUpdate).filter(QuarterUpdate.goal_id == goal.goal_id).all(), shared_counts(db).get(goal.shared_goal_id, 0))
 
 
@@ -129,6 +137,7 @@ def submit_sheet(db: Session = Depends(get_db), user: User = Depends(require_rol
         db.add(Notification(id=uid(), user_id=user.manager_id, type="Goal Submitted", message=f"{user.name} submitted goals for approval."))
     audit(db, user, "Goal Sheet Submitted", "Draft", "Pending Approval", entity="Goal Sheet", entity_id=user.id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"ok": True}
 
 
@@ -142,6 +151,7 @@ def approve(goal_id: str, payload: ApprovalIn, db: Session = Depends(get_db), us
     db.add(Notification(id=uid(), user_id=goal.user_id, type="Goal Approved", message=f"{goal.title} was approved and locked."))
     audit(db, user, "Goal Approved", "Pending", "Locked", payload.reason or "Approved", entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"ok": True}
 
 
@@ -155,6 +165,7 @@ def return_goal(goal_id: str, payload: ApprovalIn, db: Session = Depends(get_db)
     db.add(Notification(id=uid(), user_id=goal.user_id, type="Goal Returned", message=f"{goal.title} returned: {payload.reason or 'Needs rework'}"))
     audit(db, user, "Goal Returned", goal.title, "Returned", payload.reason or "Needs rework", entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"ok": True}
 
 
@@ -169,6 +180,7 @@ def unlock(goal_id: str, payload: UnlockIn, db: Session = Depends(get_db), user:
     db.add(Notification(id=uid(), user_id=goal.user_id, type="Goal Unlocked", message=f"{goal.title} unlocked by Admin: {payload.reason}"))
     audit(db, user, "Goal Unlocked", "Locked", "Unlocked", payload.reason, entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"ok": True}
 
 
@@ -183,6 +195,7 @@ def relock(goal_id: str, payload: UnlockIn, db: Session = Depends(get_db), user:
     db.add(Notification(id=uid(), user_id=goal.user_id, type="Goal Re-locked", message=f"{goal.title} re-locked by Admin: {payload.reason}"))
     audit(db, user, "Goal Re-locked", "Unlocked", "Locked", payload.reason, entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"ok": True}
 
 
@@ -211,10 +224,12 @@ def quarter_update(goal_id: str, payload: QuarterUpdateIn, db: Session = Depends
                 linked_update.achievement = payload.achievement
                 linked_update.progress = progress_for(linked_goal, linked_update)
                 linked_goal.status = payload.status
+                db.add(Notification(id=uid(), user_id=linked_goal.user_id, type="Shared Goal Sync", message=f"{goal.title} synced {payload.quarter} achievement to your linked KPI."))
         if affected > 1:
             db.add(Notification(id=uid(), user_id=goal.user_id, type="Shared Goal Sync", message=f"This update affects {affected} linked goals."))
     audit(db, user, "Quarter Update", goal.title, f"{payload.quarter}: {payload.achievement}", f"Affected linked goals: {affected}", entity="QuarterUpdate", entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"ok": True, "progress": update.progress, "affected_linked_goals": affected}
 
 
@@ -231,6 +246,7 @@ async def upload_evidence(goal_id: str, file: UploadFile, db: Session = Depends(
     goal.evidence_files = json.dumps(files)
     audit(db, user, "Evidence Uploaded", "", file.filename, entity="Evidence", entity_id=goal.goal_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"filename": file.filename}
 
 
@@ -259,4 +275,5 @@ def push_shared_goal(payload: SharedGoalIn, db: Session = Depends(get_db), user:
         db.add(Notification(id=uid(), user_id=goal.user_id, type="Shared Goal Assigned", message=f"{payload.title} was assigned as a shared KPI."))
     audit(db, user, "Shared Goal Pushed", "", payload.title, f"Recipients: {len(payload.linked_users)}", entity="SharedGoal", entity_id=shared_id)
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"shared_goal_id": shared_id, "affected_linked_goals": len(payload.linked_users)}

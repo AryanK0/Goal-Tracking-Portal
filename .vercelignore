@@ -1,0 +1,6 @@
+frontend/
+database/*.db
+.codex-temp/
+**/__pycache__/
+*.pyc
+*.log

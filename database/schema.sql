@@ -36,7 +36,7 @@ CREATE TABLE goals (
   title VARCHAR(180) NOT NULL,
   description TEXT NOT NULL,
   thrust_area VARCHAR(100) NOT NULL,
-  uom_type VARCHAR(40) NOT NULL CHECK (uom_type IN ('Numeric', 'Percentage', '%', 'Timeline', 'Zero-based')),
+  uom_type VARCHAR(40) NOT NULL CHECK (uom_type IN ('Numeric', 'Percentage', '%', 'Timeline', 'Zero', 'Zero-based')),
   direction VARCHAR(16) DEFAULT 'min' CHECK (direction IN ('min', 'max', 'timeline', 'zero')),
   target DOUBLE NOT NULL CHECK (target >= 0),
   target_label VARCHAR(80) NOT NULL,

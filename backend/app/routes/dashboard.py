@@ -9,6 +9,7 @@ from backend.app.models.entities import AIInsight, AuditLog, Comment, CycleConfi
 from collections import Counter
 
 from backend.app.services.calculations import cycle_state, department_metrics
+from backend.app.services.cache import cache_get, cache_set
 from backend.app.services.serializers import goal_out, user_out
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -16,6 +17,10 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("")
 def dashboard(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    cache_key = f"dashboard:{user.role}:{user.id}"
+    cached = cache_get(cache_key)
+    if cached:
+        return cached
     users = db.query(User).all()
     goals = db.query(Goal).all()
     updates = db.query(QuarterUpdate).all()
@@ -33,7 +38,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(current_user))
         visible_goals = [goal for goal in goal_payload if goal["user_id"] in team]
     else:
         visible_goals = goal_payload
-    return {
+    payload = {
         "current_user": user_out(user),
         "users": [user_out(item) for item in users],
         "goals": goal_payload,
@@ -116,3 +121,5 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(current_user))
             for item in db.query(AIInsight).order_by(AIInsight.created_at.desc()).all()
         ],
     }
+    cache_set(cache_key, payload)
+    return payload

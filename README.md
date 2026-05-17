@@ -58,6 +58,14 @@ Employee: naina@momentum.ai
 
 The seed contains 10 employees, 3 managers, 1 admin, realistic goals, quarter progress, notifications, audit logs, shared goals, and analytics-ready data.
 
+## Live Submission URLs
+
+```text
+Frontend: https://momentum-ai-mu.vercel.app
+Backend:  https://momentum-ai-api.vercel.app
+Health:   https://momentum-ai-api.vercel.app/health
+```
+
 ## Run Locally
 
 Use two terminals.

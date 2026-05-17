@@ -7,6 +7,7 @@ from backend.app.auth.security import hash_password, require_roles
 from backend.app.database.session import get_db
 from backend.app.models.entities import AuditLog, CycleConfig, Notification, User
 from backend.app.schemas.dto import CycleIn, UserCreate
+from backend.app.services.cache import cache_delete_prefix
 from backend.app.services.serializers import user_out
 from backend.app.utils.ids import uid
 
@@ -24,6 +25,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db), user: User =
     db.add(new_user)
     db.add(AuditLog(id=uid(), changed_by=user.id, actor_name=user.name, field_changed="User Created", old_value="", new_value=payload.email))
     db.commit()
+    cache_delete_prefix("dashboard:")
     return user_out(new_user)
 
 
@@ -41,6 +43,7 @@ def read_notification(notification_id: str, db: Session = Depends(get_db), user:
     if item and item.user_id == user.id:
         item.read = True
         db.commit()
+        cache_delete_prefix("dashboard:")
     return {"ok": True}
 
 
@@ -50,4 +53,5 @@ def save_cycle(payload: CycleIn, db: Session = Depends(get_db), user: User = Dep
     db.add(cycle)
     db.add(AuditLog(id=uid(), changed_by=user.id, actor_name=user.name, field_changed="Cycle Configured", old_value="", new_value=payload.period))
     db.commit()
+    cache_delete_prefix("dashboard:")
     return {"id": cycle.id}

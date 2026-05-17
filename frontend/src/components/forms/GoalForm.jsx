@@ -35,6 +35,9 @@ export function GoalForm({ data, refresh }) {
   const goalSetting = data.cycle_state?.windows?.["Goal Setting"];
   const actionsLocked = data.current_user.role !== "Admin" && goalSetting && !goalSetting.active;
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { title: "", description: "", thrust_area: "Execution", uom_type: "Numeric", direction: "min", target: 100, target_label: "100 units", weightage: 10 } });
+  const watchedWeightage = form.watch("weightage");
+  const selectedWeightage = Number(watchedWeightage || 0);
+  const wouldExceedWeight = selectedWeightage > remaining;
 
   const generate = async () => {
     try {
@@ -93,7 +96,9 @@ export function GoalForm({ data, refresh }) {
           <ProgressRing value={total} label={`Goal Weightage ${total}/100`} />
           <div className="grid gap-2 text-sm">
             {actionsLocked && <WarningCard tone="red" title={goalSetting.notice} />}
-            <WarningCard title={remaining === 0 ? "Weightage complete" : "Weightage remaining"} detail={`Weight: ${total}/100`} tone={remaining === 0 ? "green" : "amber"} />
+            <WarningCard title={remaining === 0 ? "Weightage complete" : "Weightage remaining"} detail={`Remaining: ${Math.max(0, remaining)} | Current: ${total}/100`} tone={remaining === 0 ? "green" : "amber"} />
+            <WarningCard title="Goal counter" detail={`${myGoals.length}/8 goals created`} tone={myGoals.length < 8 ? "green" : "amber"} />
+            {wouldExceedWeight && <WarningCard title="Weightage exceeds remaining" detail={`Selected ${selectedWeightage}, remaining ${remaining}.`} tone="red" />}
             {myGoals.some((goal) => goal.weightage < 10) && <WarningCard title="Minimum goal weightage" detail="Every goal must be at least 10%." tone="amber" />}
             {myGoals.length >= 8 && <WarningCard title={myGoals.length > 8 ? "Goal count exceeded" : "Goal count limit reached"} detail={`${myGoals.length}/8 goals`} tone={myGoals.length > 8 ? "red" : "amber"} />}
             <Button variant="primary" disabled={actionsLocked || total !== 100 || myGoals.length > 8} onClick={submitSheet}>Submit Goal Sheet</Button>
@@ -115,13 +120,13 @@ export function GoalForm({ data, refresh }) {
           </div>
           <Field label="Goal title" error={form.formState.errors.title?.message}><Input {...form.register("title")} /></Field>
           <Field label="Thrust area"><Input {...form.register("thrust_area")} /></Field>
-          <Field label="UoM"><Select {...form.register("uom_type")}><option>Numeric</option><option>Percentage</option><option>Timeline</option><option>Zero-based</option></Select></Field>
+          <Field label="UoM"><Select {...form.register("uom_type")}><option>Numeric</option><option>Percentage</option><option>Timeline</option><option>Zero</option></Select></Field>
           <Field label="Progress formula"><Select {...form.register("direction")}><option value="min">Higher is better</option><option value="max">Lower is better</option><option value="timeline">Completion date vs deadline</option><option value="zero">Zero is success</option></Select></Field>
           <Field label="Target"><Input type="number" {...form.register("target")} /></Field>
           <Field label="Target label"><Input {...form.register("target_label")} /></Field>
           <Field label="Weightage" error={form.formState.errors.weightage?.message}><Input type="number" {...form.register("weightage")} /></Field>
           <Field label="Description" error={form.formState.errors.description?.message}><Textarea {...form.register("description")} /></Field>
-          <div className="md:col-span-2"><Button variant="primary" disabled={actionsLocked || myGoals.length >= 8 || total >= 100} type="submit">Create Goal</Button></div>
+          <div className="md:col-span-2"><Button variant="primary" disabled={actionsLocked || myGoals.length >= 8 || total >= 100 || wouldExceedWeight} type="submit">Create Goal</Button></div>
         </form>
       </Card>
     </div>

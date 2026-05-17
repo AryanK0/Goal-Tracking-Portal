@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,9 +20,16 @@ finally:
     db.close()
 
 app = FastAPI(title="Momentum AI API", version="2.0.0")
+
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(127\.0\.0\.1|localhost):517[0-9]",
+    allow_origins=configured_origins,
+    allow_origin_regex=r"^(http://(127\.0\.0\.1|localhost):517[0-9]|https://[a-zA-Z0-9-]+\.vercel\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

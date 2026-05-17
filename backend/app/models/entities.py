@@ -38,7 +38,7 @@ class Goal(Base):
         CheckConstraint("target >= 0", name="ck_goals_target_non_negative"),
         CheckConstraint("direction in ('min', 'max', 'timeline', 'zero')", name="ck_goals_direction"),
         CheckConstraint("status in ('Not Started', 'On Track', 'Completed')", name="ck_goals_status"),
-        CheckConstraint("uom_type in ('Numeric', 'Percentage', '%', 'Timeline', 'Zero-based')", name="ck_goals_uom_type"),
+        CheckConstraint("uom_type in ('Numeric', 'Percentage', '%', 'Timeline', 'Zero', 'Zero-based')", name="ck_goals_uom_type"),
         CheckConstraint("approval_status in ('Draft', 'Submitted', 'Pending', 'Pending Approval', 'Returned', 'Approved', 'Locked', 'Unlocked')", name="ck_goals_approval_status"),
     )
 
