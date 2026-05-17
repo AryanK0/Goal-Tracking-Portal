@@ -1,4 +1,3 @@
-frontend/
 database/*.db
 .codex-temp/
 **/__pycache__/
