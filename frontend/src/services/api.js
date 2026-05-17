@@ -5,8 +5,11 @@ const isLocal = typeof window !== "undefined" && (
   window.location.hostname === "127.0.0.1"
 );
 
+const rawEnv = import.meta.env.VITE_API_URL;
+const envUrl = rawEnv === "/api" ? null : rawEnv;
+
 const API_CANDIDATES = [
-  import.meta.env.VITE_API_URL,
+  envUrl,
   isLocal ? "http://127.0.0.1:8000" : "https://momentum-ai-api.vercel.app",
   isLocal ? "http://127.0.0.1:8080" : null,
   isLocal ? "https://momentum-ai-api.vercel.app" : "http://127.0.0.1:8000",

@@ -23,7 +23,9 @@ export default function Login() {
   const [loading, setLoading] = useState("");
 
   useEffect(() => {
-    api.get("/api/auth/demo-credentials").then(({ data }) => setCredentials(data));
+    api.get("/api/auth/demo-credentials").then(({ data }) => {
+      if (Array.isArray(data)) setCredentials(data);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
